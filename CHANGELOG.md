@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0] — 2026-05-16
+
+First stable release. Consolidates beta.1 and beta.2.
+
+### Capabilities
+
+- `wrapAnthropic(client, options)` — two-layer Proxy (`client → messages → create`). Everything outside `messages.create` passes through untouched.
+- Non-streaming Messages capture: text extracted from `content[].text` blocks, tool calls flattened from `content[].tool_use` blocks (input JSON-stringified to the same `arguments: string` shape `@voightxyz/openai` produces — dashboards render both providers identically).
+- Streaming Messages capture: state machine over the typed event sequence (`message_start` / `content_block_start` / `content_block_delta` / `content_block_stop` / `message_delta` / `message_stop`). Per-index aggregator concatenates text deltas (`text_delta.text`) and tool-use deltas (`input_json_delta.partial_json`). Initial usage from `message_start` carries `input_tokens` + cache fields; final `output_tokens` lands on `message_delta`.
+- Path-A token breakdown: `cache_read_input_tokens` → `metadata.tokens.cache_read`, `cache_creation_input_tokens` → `metadata.tokens.cache_creation`. Both emitted only when strictly positive. `input` + `output` + `total` always present. The backend Anthropic pricing engine applies the 0.10× cache_read and 1.25× cache_creation multipliers automatically.
+- First tool call's name mirrored into top-level `toolExecuted` so the audit-log DETAIL column renders meaningfully for LLM events (same shape used for hook events).
+- `sessionId` emission: each wrapper instance resolves a UUID v4 once (or accepts an explicit override) and stamps it on `metadata.sessionId` for every event. Dashboards group events sharing a sessionId into a single trace timeline.
+- Three-level privacy redaction (`minimal` / `standard` / `full`) over prompts, response text, and tool arguments via a 12-pattern catalogue. Function-call names always survive as tags.
+- Fire-and-forget HTTP ingest to `https://api.voight.xyz/v1/events`. Never throws, never blocks the caller.
+- API key + agent identity resolution: `voightApiKey` option → `VOIGHT_KEY` env → `null`. `agent` option → `VOIGHT_AGENT` env → `HOSTNAME` env → `'unknown-agent'`.
+- Non-fatal failure modes: `enabled: false` and missing API key both return the original client untouched.
+
+### Tests
+
+- 65 unit tests across privacy, identity, ingest, messages, and wrap surfaces. All green.
+- End-to-end smoke verified against real Anthropic + real Voight backend: text, streaming text, tool use (both transports), `cache_read` on cached prompts.
+
 ## [0.1.0-beta.2] — 2026-05-16
 
 ### Added
