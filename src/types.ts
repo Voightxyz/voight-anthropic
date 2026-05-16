@@ -29,6 +29,19 @@ export interface WrapOptions {
   /** Default `'standard'`. See {@link PrivacyLevel}. */
   privacy?: PrivacyLevel
 
+  /**
+   * Trace grouping identifier. Stamped on `metadata.sessionId` of
+   * every event emitted by this wrapper instance, so the dashboard
+   * can render related calls (chat turns, multi-step agent runs)
+   * as a single trace.
+   *
+   * When omitted, the wrapper auto-generates a UUID v4 once per
+   * `wrapAnthropic()` call and reuses it for the life of the wrapped
+   * client. Pass an explicit value to scope a session yourself
+   * (per-user, per-conversation, per-request, …).
+   */
+  sessionId?: string
+
   /** Kill switch. When `false` the wrapper is a no-op pass-through. */
   enabled?: boolean
 }

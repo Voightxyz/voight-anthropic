@@ -23,6 +23,8 @@
  * the network + environment surface without touching globals.
  */
 
+import { randomUUID } from 'node:crypto'
+
 import type { WrapOptions } from './types.js'
 import { resolveApiKey, resolveAgent } from './identity.js'
 import { createIngestClient } from './ingest.js'
@@ -71,9 +73,18 @@ export function wrapAnthropic<T extends object>(
     fetch: opts._fetch,
   })
 
+  // sessionId is generated once per wrapper instance. Explicit
+  // override wins so callers can scope by user / conversation /
+  // request without us second-guessing them.
+  const sessionId =
+    typeof opts.sessionId === 'string' && opts.sessionId.trim().length > 0
+      ? opts.sessionId.trim()
+      : randomUUID()
+
   const ctx: InstrumentContext = {
     agentId,
     privacy: opts.privacy ?? 'standard',
+    sessionId,
     ingest,
     now: () => Date.now(),
   }
