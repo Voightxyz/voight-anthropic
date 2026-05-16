@@ -1,23 +1,113 @@
-// Public entrypoint of @voightxyz/anthropic.
-//
-// Today this is a scaffold pass-through: it accepts the same options
-// shape as `@voightxyz/openai`'s `wrapOpenAI` and returns the client
-// unchanged. The messages instrument lands next — see
-// `instruments/messages.ts` for the planned shape.
-//
-// Keeping the public surface stable from day one means the next
-// release can light up real capture without breaking any caller
-// who installed the scaffold against the published types.
+/**
+ * `wrapAnthropic` — the public entrypoint of @voightxyz/anthropic.
+ *
+ * Layered `Proxy`: level 0 intercepts the `messages` property,
+ * level 1 intercepts the `create` function on it. Everything outside
+ * the `client.messages.create` path passes through untouched via
+ * `Reflect.get`, so the legacy `completions` namespace, the model
+ * list endpoints, batch endpoints, and any future SDK additions
+ * keep working with zero special-casing.
+ *
+ * The proxy is one level shallower than the openai port because
+ * Anthropic exposes `messages` at the top level (no intermediate
+ * `chat` namespace).
+ *
+ * Failure modes are intentionally non-fatal — same contract as
+ * @voightxyz/openai:
+ *
+ *   - `enabled: false`         → return the original client.
+ *   - no API key resolves      → log a one-line warning and return
+ *                                 the original client.
+ *
+ * Internal `_fetch` and `_env` options exist so tests can drive
+ * the network + environment surface without touching globals.
+ */
 
 import type { WrapOptions } from './types.js'
+import { resolveApiKey, resolveAgent } from './identity.js'
+import { createIngestClient } from './ingest.js'
+import {
+  instrumentMessages,
+  type InstrumentContext,
+} from './instruments/messages.js'
+
+interface InternalOptions extends WrapOptions {
+  _fetch?: typeof fetch
+  _env?: Record<string, string | undefined>
+}
+
+const DEFAULT_API_BASE = 'https://api.voight.xyz'
 
 export function wrapAnthropic<T extends object>(
   client: T,
-  _options: WrapOptions = {},
+  options: WrapOptions = {},
 ): T {
-  // Scaffold: no proxy, no ingest. The next release wires in
-  // `instrumentMessages` from `instruments/messages.ts` via a
-  // three-layer Proxy (client → messages → create), matching the
-  // pattern proven in @voightxyz/openai.
-  return client
+  const opts = options as InternalOptions
+
+  if (opts.enabled === false) return client
+
+  const env = opts._env ?? process.env
+  const apiKey = resolveApiKey(
+    { voightApiKey: opts.voightApiKey, agent: opts.agent },
+    env,
+  )
+
+  if (apiKey === null) {
+    console.warn(
+      '[voight] no VOIGHT_KEY resolved — wrapper is a pass-through. ' +
+        'Set process.env.VOIGHT_KEY or pass `voightApiKey` to wrapAnthropic() to enable capture.',
+    )
+    return client
+  }
+
+  const agentId = resolveAgent(
+    { voightApiKey: opts.voightApiKey, agent: opts.agent },
+    env,
+  )
+
+  const ingest = createIngestClient({
+    apiBase: opts.apiBase ?? DEFAULT_API_BASE,
+    apiKey,
+    fetch: opts._fetch,
+  })
+
+  const ctx: InstrumentContext = {
+    agentId,
+    privacy: opts.privacy ?? 'standard',
+    ingest,
+    now: () => Date.now(),
+  }
+
+  return new Proxy(client, {
+    get(target, prop, receiver) {
+      if (prop === 'messages') {
+        const messages = Reflect.get(target, prop, receiver)
+        return wrapMessages(messages as object, ctx)
+      }
+      return Reflect.get(target, prop, receiver)
+    },
+  })
+}
+
+function wrapMessages<M extends object>(
+  messages: M,
+  ctx: InstrumentContext,
+): M {
+  return new Proxy(messages, {
+    get(target, prop, receiver) {
+      if (prop === 'create') {
+        const original = Reflect.get(target, prop, receiver) as (
+          params: never,
+        ) => Promise<unknown>
+        // .bind so `this` inside the SDK's `create` stays the real
+        // messages instance, not the proxy. Without this the
+        // Anthropic SDK loses access to its internal http client.
+        return instrumentMessages(
+          original.bind(target) as never,
+          ctx,
+        )
+      }
+      return Reflect.get(target, prop, receiver)
+    },
+  })
 }
