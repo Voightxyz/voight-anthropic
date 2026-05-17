@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.5] — 2026-05-17
+
+Trace-level observability primitives — mirrors the same release shipped today in `@voightxyz/openai@0.1.5`. The Voight dashboard's AI Apps trace drill-down (span tree, Logs sub-tab, endpoint grouping, parent links) now has real data to draw on from Anthropic-wrapped calls too.
+
+### Added
+
+- **`withTrace(fn, options?)`** — opens an `AsyncLocalStorage` frame for the lifetime of `fn` so log lines and nested wrapper calls bind to the same trace. Optional `routeTag` overrides the wrapper-level value for this trace only.
+- **`log(message, options?)`** — appends a structured line (`{ ts, level, message }`) to the active trace's log buffer. The next wrapped call drains the buffer into `metadata.logs` so the dashboard's Logs sub-tab on the trace drill-down stays scoped to "what happened around this call". No-op (silent drop) when called outside `withTrace`.
+- **`WrapOptions.routeTag`** — application-level endpoint / job tag stamped on `metadata.endpoint` of every event from this wrapper instance. Trace-level override wins when both are set.
+- **Span tree** — every event now carries `metadata.spanId` (UUID v4 per intercepted call). Nested wrapped calls during another wrapped call's execution land with `metadata.parentSpanId` pointing at the enclosing call's span.
+
+### Tests
+
+- 22 new unit tests covering the context layer + integration with the messages instrument. 87/87 tests green (was 65).
+
+### Compatibility
+
+Fully backward-compatible with `0.1.0`. New fields are additive on `metadata`; callers that don't adopt `withTrace` / `log` / `routeTag` see no change in event shape beyond the always-present `metadata.spanId`.
+
 ## [0.1.0] — 2026-05-16
 
 First stable release. Consolidates beta.1 and beta.2.

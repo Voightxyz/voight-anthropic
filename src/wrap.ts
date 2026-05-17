@@ -81,10 +81,16 @@ export function wrapAnthropic<T extends object>(
       ? opts.sessionId.trim()
       : randomUUID()
 
+  const routeTag =
+    typeof opts.routeTag === 'string' && opts.routeTag.trim().length > 0
+      ? opts.routeTag.trim()
+      : undefined
+
   const ctx: InstrumentContext = {
     agentId,
     privacy: opts.privacy ?? 'standard',
     sessionId,
+    routeTag,
     ingest,
     now: () => Date.now(),
   }
