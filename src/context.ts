@@ -46,6 +46,13 @@ export interface TraceFrame {
    *  it wins over the per-wrapper `routeTag` because it's the more
    *  specific signal (the route that triggered this trace). */
   routeTag?: string
+  /** Optional key-value tags stamped on `metadata.tags` of every
+   *  event emitted in this trace. The canonical use is per-user
+   *  spend tracking — pass `{ userId, plan, org, … }` at the
+   *  request boundary so the dashboard can filter / aggregate by
+   *  any of them. Tags pass through verbatim; redacting / hashing
+   *  is the caller's responsibility (matches the `log()` contract). */
+  tags?: Record<string, unknown>
   /** Span id of the currently-executing wrapped call inside this
    *  trace, or undefined when no call is in flight. Read by nested
    *  calls to set their `parentSpanId`. */
@@ -62,15 +69,27 @@ const traceStore = new AsyncLocalStorage<TraceFrame>()
  */
 export function withTrace<T>(
   fn: () => Promise<T> | T,
-  options: { routeTag?: string } = {},
+  options: {
+    routeTag?: string
+    tags?: Record<string, unknown>
+  } = {},
 ): Promise<T> {
   const routeTag =
     typeof options.routeTag === 'string' && options.routeTag.trim().length > 0
       ? options.routeTag.trim()
       : undefined
+  // Tags drop to undefined when the caller passes an empty object so
+  // the event payload doesn't carry a meaningless `metadata.tags: {}`.
+  const tags =
+    options.tags &&
+    typeof options.tags === 'object' &&
+    Object.keys(options.tags).length > 0
+      ? options.tags
+      : undefined
   const frame: TraceFrame = {
     logs: [],
     routeTag,
+    tags,
     currentSpanId: undefined,
   }
   return Promise.resolve(traceStore.run(frame, fn))

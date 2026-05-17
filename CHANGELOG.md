@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.6] — 2026-05-17
+
+Mirrors `@voightxyz/openai@0.1.6` — per-trace `tags` option on `withTrace` for per-user spend tracking. Same API, same metadata shape, fully backward-compatible with `0.1.5`.
+
+### Added
+
+- **`withTrace(fn, { tags })`** — stamps a key-value `Record<string, unknown>` on `metadata.tags` of every event emitted in the trace. Use it for per-request user identification:
+
+  ```ts
+  withTrace(async () => { ... }, {
+    routeTag: 'POST /api/chat',
+    tags: { userId: req.user.id, plan: req.user.plan, org: req.user.orgId },
+  })
+  ```
+
+### Tests
+
+- 5 new unit tests in `tests/unit/context.test.ts`. 92/92 tests green (was 87).
+
+### Compatibility
+
+Backward-compatible with `0.1.5`. `tags` is optional; empty `{}` collapses to `undefined` so `metadata.tags: {}` never lands on the wire.
+
 ## [0.1.5] — 2026-05-17
 
 Trace-level observability primitives — mirrors the same release shipped today in `@voightxyz/openai@0.1.5`. The Voight dashboard's AI Apps trace drill-down (span tree, Logs sub-tab, endpoint grouping, parent links) now has real data to draw on from Anthropic-wrapped calls too.

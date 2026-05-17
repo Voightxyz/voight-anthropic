@@ -356,6 +356,11 @@ function assembleEvent(args: {
   }
   if (span.parentSpanId) metadata.parentSpanId = span.parentSpanId
   if (span.endpoint) metadata.endpoint = span.endpoint
+  // Tags propagate from the active trace frame (set via
+  // `withTrace({ tags })`) so the dashboard can filter / aggregate
+  // by user / plan / org / any custom dimension the caller supplies.
+  const trace = getCurrentTrace()
+  if (trace?.tags) metadata.tags = trace.tags
   const drainedLogs = drainTraceLogs()
   if (drainedLogs.length > 0) metadata.logs = drainedLogs
   if (tokens) metadata.tokens = tokens

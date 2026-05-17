@@ -93,9 +93,47 @@ describe('withTrace — frame lifecycle', () => {
         expect(trace).toBeDefined()
         expect(trace!.logs).toEqual([])
         expect(trace!.routeTag).toBe('POST /api/chat')
+        expect(trace!.tags).toBeUndefined()
         expect(trace!.currentSpanId).toBeUndefined()
       },
       { routeTag: 'POST /api/chat' },
+    )
+  })
+
+  it('attaches supplied tags to the frame for downstream events', async () => {
+    await withTrace(
+      async () => {
+        expect(getCurrentTrace()!.tags).toEqual({
+          userId: 'user_123',
+          plan: 'pro',
+          org: 'acme-corp',
+        })
+      },
+      { tags: { userId: 'user_123', plan: 'pro', org: 'acme-corp' } },
+    )
+  })
+
+  it('drops an empty tags object to undefined (no metadata.tags: {} on events)', async () => {
+    await withTrace(
+      async () => {
+        expect(getCurrentTrace()!.tags).toBeUndefined()
+      },
+      { tags: {} },
+    )
+  })
+
+  it('isolates tags across nested withTrace calls', async () => {
+    await withTrace(
+      async () => {
+        await withTrace(
+          async () => {
+            expect(getCurrentTrace()!.tags).toEqual({ userId: 'inner' })
+          },
+          { tags: { userId: 'inner' } },
+        )
+        expect(getCurrentTrace()!.tags).toEqual({ userId: 'outer' })
+      },
+      { tags: { userId: 'outer' } },
     )
   })
 
@@ -261,6 +299,52 @@ describe('messages × context', () => {
     expect((events[0]!.metadata as Record<string, unknown>).endpoint).toBe(
       'cron:rollup',
     )
+  })
+
+  it('propagates withTrace tags onto metadata.tags of every emitted event', async () => {
+    const { ctx, events } = makeContext()
+    const wrapped = instrumentMessages(
+      (async () => nonStreamingResponse()) as never,
+      ctx,
+    )
+    await withTrace(
+      async () => {
+        await wrapped({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 100,
+          messages: [{ role: 'user', content: 'hi' }],
+        } as never)
+        await wrapped({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 100,
+          messages: [{ role: 'user', content: 'hi again' }],
+        } as never)
+      },
+      {
+        tags: { userId: 'user_alpha', plan: 'pro' },
+      },
+    )
+    for (const evt of events) {
+      const meta = evt.metadata as Record<string, unknown>
+      expect(meta.tags).toEqual({ userId: 'user_alpha', plan: 'pro' })
+    }
+  })
+
+  it('omits metadata.tags when withTrace is opened without tags', async () => {
+    const { ctx, events } = makeContext()
+    const wrapped = instrumentMessages(
+      (async () => nonStreamingResponse()) as never,
+      ctx,
+    )
+    await withTrace(async () => {
+      await wrapped({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: 'hi' }],
+      } as never)
+    })
+    const meta = events[0]!.metadata as Record<string, unknown>
+    expect(meta.tags).toBeUndefined()
   })
 
   it('lets a withTrace routeTag override the wrapper-level routeTag', async () => {
