@@ -1,6 +1,6 @@
 {
   "name": "@voightxyz/anthropic",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Voight observability for the Anthropic SDK. Wrap your Anthropic client and capture every Messages call — prompts, tokens, costs, cache reads, tool use, latency, errors — surfaced live in the Voight dashboard.",
   "keywords": [
     "anthropic",
@@ -47,7 +47,7 @@
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "@anthropic-ai/sdk": ">=0.30.0"
+    "@anthropic-ai/sdk": ">=0.27.0"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.96.0",

@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.7] — 2026-05-17
+
+Loosen `@anthropic-ai/sdk` peer-dependency from `>=0.30.0` to `>=0.27.0` so the wrapper installs cleanly against production apps still on older SDK versions (Anthropic's own `customer-support-agent` quickstart pins `^0.27.1`; `financial-data-analyst` pinned `^0.29.0` — both rejected `0.1.6` install with `ERESOLVE`).
+
+### Why this is safe
+
+The wrapper consumes `@anthropic-ai/sdk` purely structurally — no type imports, only runtime field reads from `messages.create` response (`usage.input_tokens`, `usage.output_tokens`, `usage.cache_read_input_tokens`, `usage.cache_creation_input_tokens`, `content[].text`, `content[].tool_use`). All reads go through `numberOrZero()` defensive helpers, so SDK versions that don't carry the optional cache fields degrade gracefully (no crash, just no cache data captured for those events).
+
+### Tests
+
+92/92 tests still green. No code changes — peer-dependency metadata only.
+
+### Compatibility
+
+Forward-compatible with all `@voightxyz/anthropic@0.1.x` callers. Installs against `@anthropic-ai/sdk@0.27.x` through `0.96.x` (current) — runtime smoke verified against 0.29.0 and 0.96.0.
+
 ## [0.1.6] — 2026-05-17
 
 Mirrors `@voightxyz/openai@0.1.6` — per-trace `tags` option on `withTrace` for per-user spend tracking. Same API, same metadata shape, fully backward-compatible with `0.1.5`.
