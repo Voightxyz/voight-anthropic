@@ -42,6 +42,16 @@ export interface WrapOptions {
    */
   sessionId?: string
 
+  /**
+   * Application-level route tag stamped on `metadata.endpoint` of
+   * every event from this wrapper. Lets the dashboard group calls
+   * by user-facing endpoint, cron job, or background worker
+   * (`'POST /api/chat'`, `'cron:nightly-rollup'`, …). Static per
+   * wrapper instance — instantiate one wrapper per route, or set
+   * the value dynamically via `withTrace({ routeTag })`.
+   */
+  routeTag?: string
+
   /** Kill switch. When `false` the wrapper is a no-op pass-through. */
   enabled?: boolean
 }
