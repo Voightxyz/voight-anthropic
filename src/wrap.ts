@@ -32,6 +32,11 @@ import {
   instrumentMessages,
   type InstrumentContext,
 } from './instruments/messages.js'
+import { createEmitter, type OtelEmitter } from './otel-emit.js'
+
+// Static version tag passed to OTel's `trace.getTracer(name, version)`.
+// Used for telemetry metadata only — span shape is decoupled.
+const PACKAGE_VERSION = '0.1.8'
 
 interface InternalOptions extends WrapOptions {
   _fetch?: typeof fetch
@@ -86,6 +91,24 @@ export function wrapAnthropic<T extends object>(
       ? opts.routeTag.trim()
       : undefined
 
+  // Opt-in OpenTelemetry side-channel. When `otel: true`, every
+  // captured event is also emitted as a span. We try to load
+  // `@opentelemetry/api` lazily; if it's not installed, `createEmitter`
+  // returns null and we silently fall back to direct-only ingestion.
+  let otelEmitter: OtelEmitter | null = null
+  if (opts.otel === true) {
+    otelEmitter = createEmitter({
+      packageName: '@voightxyz/anthropic',
+      packageVersion: PACKAGE_VERSION,
+      onLoadError: (err) => {
+        console.warn(
+          '[voight] otel: true was requested but @opentelemetry/api could not be loaded — wrapper falls back to direct ingestion only.',
+          err instanceof Error ? err.message : err,
+        )
+      },
+    })
+  }
+
   const ctx: InstrumentContext = {
     agentId,
     privacy: opts.privacy ?? 'standard',
@@ -93,6 +116,9 @@ export function wrapAnthropic<T extends object>(
     routeTag,
     ingest,
     now: () => Date.now(),
+    ...(otelEmitter !== null
+      ? { emitOtelSpan: (event) => otelEmitter!.emit(event) }
+      : {}),
   }
 
   return new Proxy(client, {

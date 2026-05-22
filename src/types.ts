@@ -54,6 +54,32 @@ export interface WrapOptions {
 
   /** Kill switch. When `false` the wrapper is a no-op pass-through. */
   enabled?: boolean
+
+  /**
+   * Emit OpenTelemetry spans alongside the direct ingestion to
+   * `api.voight.xyz`. Off by default.
+   *
+   * When `true`, every captured event is also written as an OTel
+   * span with `gen_ai.*` semantic-convention attributes, picked up
+   * by whichever `TracerProvider` is registered in the host
+   * process. Lets you use this wrapper inside an OTel-mandated
+   * stack — pair it with Langfuse / Phoenix / Datadog / Sentry /
+   * Voight's own `@voightxyz/vercel-ai` exporter without losing
+   * the direct flow.
+   *
+   * Requires `@opentelemetry/api` ≥1.4 as a peer dep. If the
+   * package isn't installed, the wrapper logs a one-time warning
+   * and the flag is treated as `false` — direct ingestion still
+   * works as normal.
+   *
+   * Each emitted span carries a `voight.source: 'wrapper'`
+   * attribute that the Voight backend's own exporter
+   * (`@voightxyz/vercel-ai`) uses to dedupe — if both this wrapper
+   * AND the Voight exporter are wired into the same process, the
+   * exporter skips the wrapper's spans so you don't get duplicate
+   * events.
+   */
+  otel?: boolean
 }
 
 /**

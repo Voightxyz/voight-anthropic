@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.8-beta.1] — 2026-05-22
+
+OpenTelemetry opt-in side-channel. Mirror of
+[@voightxyz/openai@0.1.7-beta.1](https://www.npmjs.com/package/@voightxyz/openai)
+— same `otel: true` flag, same `gen_ai.*` + `ai.*` attribute shape,
+same `voight.source: 'wrapper'` dedup marker, same optional peer
+on `@opentelemetry/api`. Lets the wrapper participate in
+OTel-mandated stacks (Langfuse / Phoenix / Datadog / Sentry /
+[@voightxyz/vercel-ai](https://www.npmjs.com/package/@voightxyz/vercel-ai))
+without losing the direct ingestion to `api.voight.xyz`.
+
+Only differences from the OpenAI port:
+
+- Span name is `voight.anthropic.messages` (Anthropic exposes the
+  Messages API, not `chat.completions`).
+- `gen_ai.system` resolves to `anthropic` (vs `openai`).
+
+### Notes
+
+- Default `otel: false` ships unchanged — existing direct ingestion
+  path stays the canonical source of truth.
+- `@opentelemetry/api` is now an **optional** peer dep. Projects
+  that never set `otel: true` are unaffected.
+- Tests: 92 → 109 green (17 new — port of the openai-side suite
+  with anthropic-specific fixtures).
+
+Ships as `@beta` alongside `@voightxyz/openai@0.1.7-beta.1` and
+`@voightxyz/vercel-ai@0.1.1-beta.1` for one cycle of registry
+validation before the @latest promotion.
+
 ## [0.1.7] — 2026-05-17
 
 Loosen `@anthropic-ai/sdk` peer-dependency from `>=0.30.0` to `>=0.27.0` so the wrapper installs cleanly against production apps still on older SDK versions (Anthropic's own `customer-support-agent` quickstart pins `^0.27.1`; `financial-data-analyst` pinned `^0.29.0` — both rejected `0.1.6` install with `ERESOLVE`).

@@ -172,6 +172,17 @@ export interface InstrumentContext {
   ingest: EventSink
   /** Time source in ms; injected so tests can produce deterministic `durationMs`. */
   now: () => number
+  /**
+   * Optional OTel side-channel — mirror of the field on
+   * `@voightxyz/openai`'s `InstrumentContext`. Set only when
+   * `wrapAnthropic()` was called with `otel: true` AND
+   * `@opentelemetry/api` is installed in the host process.
+   *
+   * Called *after* `ingest.send()` in every captured path so the
+   * direct ingestion flow stays the canonical source of truth.
+   * Failure-isolated by `createEmitter`: this function never throws.
+   */
+  emitOtelSpan?: (event: EventPayload) => void
 }
 
 /**
@@ -209,14 +220,26 @@ export function instrumentMessages(
         try {
           result = (await original(params)) as NonStreamingMessage
         } catch (err) {
-          ctx.ingest.send(
-            buildFailureEvent({ ctx, params, startedAt, error: err, span }),
-          )
+          const failureEvent = buildFailureEvent({
+            ctx,
+            params,
+            startedAt,
+            error: err,
+            span,
+          })
+          ctx.ingest.send(failureEvent)
+          ctx.emitOtelSpan?.(failureEvent)
           throw err
         }
-        ctx.ingest.send(
-          buildSuccessEvent({ ctx, params, startedAt, response: result, span }),
-        )
+        const successEvent = buildSuccessEvent({
+          ctx,
+          params,
+          startedAt,
+          response: result,
+          span,
+        })
+        ctx.ingest.send(successEvent)
+        ctx.emitOtelSpan?.(successEvent)
         return result
       })
     }
@@ -234,9 +257,15 @@ export function instrumentMessages(
       result = (await original(params)) as AsyncIterable<StreamEvent>
     } catch (err) {
       if (trace) trace.currentSpanId = previousSpanId
-      ctx.ingest.send(
-        buildFailureEvent({ ctx, params, startedAt, error: err, span }),
-      )
+      const failureEvent = buildFailureEvent({
+        ctx,
+        params,
+        startedAt,
+        error: err,
+        span,
+      })
+      ctx.ingest.send(failureEvent)
+      ctx.emitOtelSpan?.(failureEvent)
       throw err
     }
 
@@ -517,19 +546,19 @@ function wrapStream(
   function emit() {
     if (emitted) return
     emitted = true
-    ctx.ingest.send(
-      buildStreamEvent({
-        ctx,
-        params,
-        startedAt,
-        aggregatedText: state.aggregatedText,
-        tokens: normaliseTokens(state.usage ?? undefined),
-        toolCalls: snapshotTools(state.toolBlocks),
-        modelFromResponse: state.modelFromResponse,
-        finishReason: state.finishReason,
-        span,
-      }),
-    )
+    const streamEvent = buildStreamEvent({
+      ctx,
+      params,
+      startedAt,
+      aggregatedText: state.aggregatedText,
+      tokens: normaliseTokens(state.usage ?? undefined),
+      toolCalls: snapshotTools(state.toolBlocks),
+      modelFromResponse: state.modelFromResponse,
+      finishReason: state.finishReason,
+      span,
+    })
+    ctx.ingest.send(streamEvent)
+    ctx.emitOtelSpan?.(streamEvent)
   }
 
   return {
@@ -540,9 +569,15 @@ function wrapStream(
           yield ev
         }
       } catch (err) {
-        ctx.ingest.send(
-          buildFailureEvent({ ctx, params, startedAt, error: err, span }),
-        )
+        const failureEvent = buildFailureEvent({
+          ctx,
+          params,
+          startedAt,
+          error: err,
+          span,
+        })
+        ctx.ingest.send(failureEvent)
+        ctx.emitOtelSpan?.(failureEvent)
         emitted = true
         throw err
       } finally {
