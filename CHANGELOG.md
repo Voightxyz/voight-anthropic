@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.8] — 2026-05-22
+
+Promoted from `0.1.8-beta.1` after a clean smoke cycle from the
+beta registry — same shipping content, dropped the `-beta.1`
+suffix and removed `publishConfig.tag`. No code changes between
+beta and stable.
+
 ## [0.1.8-beta.1] — 2026-05-22
 
 OpenTelemetry opt-in side-channel. Mirror of
