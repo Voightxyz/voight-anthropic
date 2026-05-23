@@ -112,6 +112,27 @@ The wrapper passes everything else through untouched. Bedrock and Vertex clients
 | `privacy` | `'minimal' \| 'standard' \| 'full'` | `'standard'` | Capture aggressiveness |
 | `sessionId` | string | auto UUID v4 | Trace grouping. Stable across calls of one wrapper instance |
 | `enabled` | boolean | `true` | Kill switch — returns the original client untouched |
+| `otel` | boolean | `false` | Emit captured calls as OpenTelemetry spans alongside the direct ingest. See [OpenTelemetry side-channel](#opentelemetry-side-channel) below. |
+
+## OpenTelemetry side-channel
+
+By default the wrapper POSTs each captured call directly to `api.voight.xyz`. Set `otel: true` to **additionally** emit each call as an OpenTelemetry span — useful when the host process already runs an OTel pipeline (Langfuse, Phoenix, Datadog, Sentry, or [`@voightxyz/vercel-ai`](https://www.npmjs.com/package/@voightxyz/vercel-ai)) and you want Voight events to appear there too.
+
+```ts
+const client = wrapAnthropic(new Anthropic(), { agent: 'my-app', otel: true })
+```
+
+Each span is named `voight.anthropic.messages` and carries the standard `gen_ai.*` semantic-convention attributes (`gen_ai.system` resolves to `'anthropic'`, plus `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `gen_ai.usage.cache_read_input_tokens`, `gen_ai.response.finish_reasons`) plus the parallel Vercel-style `ai.*` namespace for cross-tool compatibility.
+
+The direct ingest is unchanged — `otel: true` is purely additive. Default `otel: false` ships byte-identical behaviour to 0.1.7.
+
+### Dedup marker
+
+Every emitted span carries `voight.source: 'wrapper'`. If you also use [`@voightxyz/vercel-ai`](https://www.npmjs.com/package/@voightxyz/vercel-ai) ≥ 0.1.1 in the same process, that exporter recognises the marker and skips wrapper-emitted spans — no duplicate events in your dashboard.
+
+### Optional peer dependency
+
+`@opentelemetry/api` is now an **optional** peer dependency. If you never set `otel: true`, nothing changes — no extra install, no runtime cost. If you set `otel: true` but the package isn't installed, the wrapper logs a single warning and falls back to direct ingest only.
 
 ## Privacy
 
