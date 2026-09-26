@@ -1,7 +1,7 @@
 {
   "name": "@voightxyz/anthropic",
   "version": "0.1.8",
-  "description": "Voight observability for the Anthropic SDK. Wrap your Anthropic client and capture every Messages call — prompts, tokens, costs, cache reads, tool use, latency, errors — surfaced live in the Voight dashboard.",
+  "description": "Drop-in observability for the Anthropic Node SDK. Wrap your client once and every messages.create call lands in Voight: prompts, tokens, cache reads, cache creations, tool use, latency, errors.",
   "keywords": [
     "anthropic",
     "claude",
