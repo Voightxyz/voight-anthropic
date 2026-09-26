@@ -1,6 +1,6 @@
 {
   "name": "@voightxyz/anthropic",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Drop-in observability for the Anthropic Node SDK. Wrap your client once and every messages.create call lands in Voight: prompts, tokens, cache reads, cache creations, tool use, latency, errors.",
   "keywords": [
     "anthropic",
